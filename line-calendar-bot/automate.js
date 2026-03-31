@@ -1,12 +1,11 @@
 // ============================================================
 // LINE × Google Calendar Bot — 自動セットアップスクリプト
 // 使い方: node automate.js
-//
-// Playwright 不使用。承認は既存の Chrome で行います。
 // ============================================================
 
 const https        = require('https');
-const { execSync, spawnSync } = require('child_process');
+const { execSync } = require('child_process');
+const { spawnSync }= require('child_process');
 const fs           = require('fs');
 const path         = require('path');
 const readline     = require('readline');
@@ -18,11 +17,11 @@ const SCRIPT_ID      = '1_WxwEmNPl-LTCTYd0BdQGTvk8pKAwAyS7SbHU6b5KigVjPhzN258X8T
 const PROD_DEPLOY_ID = 'AKfycbwOEMgIlsZwZWOJ6DvDR2vTOPPppz12rn-82xghwhrgS6xSj2meoFab32cGL8Fkvzm6mw';
 const PROD_WEBHOOK   = `https://script.google.com/macros/s/${PROD_DEPLOY_ID}/exec`;
 
-const LINE_TOKEN  = 'yurY0ucKSoXIkIUijwLCwArcMlZpyLUOjvylJkgy4a5TQNIIoo1hLywGQGTsqq/bElzU+DaU7dA2R6Hq6zpjpay9yYfT48uHTasxY7SJkiwWw2rdB0JfCmzTfBvv1wTi7TYbI7WymwLrivneRD8yegdB04t89/1O/w1cDnyilFU=';
-const GEMINI_KEY  = 'AIzaSyCTEEZalAVd19w6sS8G2VBN4bekzvXx9nQ';
-const SETUP_TOKEN = 'setup2026';
+const LINE_TOKEN = 'yurY0ucKSoXIkIUijwLCwArcMlZpyLUOjvylJkgy4a5TQNIIoo1hLywGQGTsqq/bElzU+DaU7dA2R6Hq6zpjpay9yYfT48uHTasxY7SJkiwWw2rdB0JfCmzTfBvv1wTi7TYbI7WymwLrivneRD8yegdB04t89/1O/w1cDnyilFU=';
+const GEMINI_KEY = 'AIzaSyCTEEZalAVd19w6sS8G2VBN4bekzvXx9nQ';
 
-const CODE_GS_PATH = path.join(__dirname, 'Code.gs');
+const CODE_GS_PATH   = path.join(__dirname, 'Code.gs');
+const GAS_EDITOR_URL = `https://script.google.com/d/${SCRIPT_ID}/edit`;
 
 // ============================================================
 // ユーティリティ
@@ -33,8 +32,7 @@ function waitForEnter(msg) {
 }
 
 function run(cmd) {
-  console.log('  $ ' + cmd);
-  return execSync(cmd, { cwd: __dirname, encoding: 'utf8' });
+  execSync(cmd, { cwd: __dirname, stdio: 'inherit' });
 }
 
 function openInChrome(url) {
@@ -42,93 +40,70 @@ function openInChrome(url) {
 }
 
 // ============================================================
-// GAS コードに一時的なセットアップ用 doGet を追加・削除
+// Code.gs に一時セットアップ関数を追加
 // ============================================================
-const SETUP_DOGET = `
-// ===== 一時セットアップ関数（自動で削除されます） =====
-function doGet(e) {
-  if ((e.parameter.token || '') !== '${SETUP_TOKEN}') {
-    return ContentService.createTextOutput('unauthorized');
-  }
+const INIT_FUNCTION = `
+// ===== 一時セットアップ関数（実行後に自動削除されます） =====
+function initBot() {
   var p = PropertiesService.getScriptProperties();
   p.setProperty('LINE_CHANNEL_ACCESS_TOKEN', '${LINE_TOKEN}');
   p.setProperty('GEMINI_API_KEY', '${GEMINI_KEY}');
   p.setProperty('CALENDAR_ID', 'primary');
-  CalendarApp.getDefaultCalendar(); // カレンダー権限を付与
-  return ContentService.createTextOutput(
-    '✅ セットアップ完了！\\nこのタブを閉じてターミナルで Enter を押してください。'
-  );
+  CalendarApp.getDefaultCalendar();
+  Logger.log('✅ セットアップ完了！プロパティとカレンダー権限の設定が終わりました。');
 }
 // ===== ここまで =====
 `;
 
-function addSetupCode() {
-  const original = fs.readFileSync(CODE_GS_PATH, 'utf8');
-  fs.writeFileSync(CODE_GS_PATH, original + SETUP_DOGET);
-  return original; // 元のコードを返す（後で復元するため）
-}
-
-function restoreCode(original) {
-  fs.writeFileSync(CODE_GS_PATH, original);
-}
-
-// ============================================================
-// メイン
-// ============================================================
 (async () => {
   console.log('\n====================================');
-  console.log(' LINE Calendar Bot セットアップ開始');
+  console.log(' LINE Calendar Bot セットアップ');
   console.log('====================================\n');
 
-  // ---- Step 1: Code.gs にセットアップ用 doGet を追加してプッシュ ----
-  console.log('[1/4] セットアップ用コードを準備中...');
-  const originalCode = addSetupCode();
+  // ---- Step 1: initBot 関数を追加してプッシュ ----
+  console.log('[1/3] セットアップ用コードをGASにアップロード中...');
+  const original = fs.readFileSync(CODE_GS_PATH, 'utf8');
+  fs.writeFileSync(CODE_GS_PATH, original + INIT_FUNCTION);
   run('clasp push --force');
 
-  // セットアップ用に一時デプロイ
-  const deployOutput = run('clasp deploy --description "setup-temp"');
-  console.log(deployOutput);
+  // ---- Step 2: GASエディタをChromeで開く ----
+  console.log('\n[2/3] GASエディタをChromeで開いています...\n');
+  openInChrome(GAS_EDITOR_URL);
 
-  // デプロイIDを取得
-  const match = deployOutput.match(/Deployed\s+(\S+)\s+@/);
-  if (!match) {
-    console.error('❌ デプロイIDが取得できませんでした');
-    restoreCode(originalCode);
-    process.exit(1);
-  }
-  const setupDeployId = match[1];
-  const setupUrl = `https://script.google.com/macros/s/${setupDeployId}/exec?token=${SETUP_TOKEN}`;
+  console.log('============================================');
+  console.log(' Chrome でこの手順を行ってください：');
+  console.log('============================================');
+  console.log('');
+  console.log('  1. エディタ上部のドロップダウンで');
+  console.log('     「initBot」を選択');
+  console.log('');
+  console.log('  2. ▶（実行）ボタンをクリック');
+  console.log('');
+  console.log('  3. 「権限を確認」ダイアログが出たら:');
+  console.log('     → アカウントを選択');
+  console.log('     → 「詳細」→「安全でないページに移動」');
+  console.log('     → 「許可」をクリック');
+  console.log('');
+  console.log('  4. 実行ログに「✅ セットアップ完了！」が出たらOK');
+  console.log('');
 
-  console.log('\n[2/4] Chrome でセットアップページを開きます...');
-  console.log('      URL: ' + setupUrl);
-  openInChrome(setupUrl);
+  await waitForEnter('「✅ セットアップ完了！」が出たら Enter を押してください: ');
 
-  console.log('\n  ⚠️  Chrome でこの手順を行ってください:');
-  console.log('  1. 「このアプリはGoogleで確認されていません」が出たら「詳細」→「安全でないページに移動」');
-  console.log('  2. Googleアカウントを選んで「許可」をクリック');
-  console.log('  3. 画面に「✅ セットアップ完了！」と表示されたら完了\n');
-
-  await waitForEnter('Chrome で「✅ セットアップ完了！」が表示されたら Enter を押してください: ');
-
-  // ---- Step 2: コードを元に戻して再プッシュ ----
-  console.log('\n[3/4] 一時セットアップコードを削除して本番コードを更新中...');
-  restoreCode(originalCode);
+  // ---- Step 3: コードを元に戻す & LINE Webhook 登録 ----
+  console.log('\n[3/3] 後片付けと LINE Webhook 登録中...');
+  fs.writeFileSync(CODE_GS_PATH, original);
   run('clasp push --force');
 
-  // ---- Step 3: LINE Webhook を登録 ----
-  console.log('\n[4/4] LINE Webhook URL を登録中...');
   await setLineWebhook(LINE_TOKEN, PROD_WEBHOOK);
-  console.log('  ✅ LINE Webhook 登録完了');
 
   console.log('\n====================================');
   console.log(' 🎉 セットアップ完了！');
   console.log('====================================');
-  console.log('\n Webhook URL:');
+  console.log('\n LINE Webhook URL:');
   console.log('  ' + PROD_WEBHOOK);
-  console.log('\n LINEでテストしてみてください:');
+  console.log('\n LINEで送ってテストしてみてください:');
   console.log('  「来週月曜日の午後3時にミーティング」');
-  console.log('  「明日の14時から15時まで歯医者」');
-  console.log('  「今週木曜日の夜に電話」\n');
+  console.log('  「明日の14時から15時まで歯医者」\n');
 })();
 
 // ============================================================
@@ -153,10 +128,11 @@ function setLineWebhook(token, webhookUrl) {
         res.on('data', c => (data += c));
         res.on('end', () => {
           if (res.statusCode === 200) {
+            console.log('  ✅ LINE Webhook 登録完了');
             resolve(data);
           } else {
-            console.error('  LINE API error: ' + res.statusCode + ' ' + data);
-            resolve(data); // エラーでも続行
+            console.error('  ⚠️  LINE API: ' + res.statusCode + ' ' + data);
+            resolve(data);
           }
         });
       }
