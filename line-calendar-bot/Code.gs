@@ -5,7 +5,7 @@
 // 【セットアップ】
 // 1. スクリプトプロパティに以下を設定:
 //    - LINE_CHANNEL_ACCESS_TOKEN : LINE Developers Console で取得
-//    - CLAUDE_API_KEY            : console.anthropic.com で取得
+//    - GEMINI_API_KEY            : Google AI Studio (aistudio.google.com) で無料取得
 //    - CALENDAR_ID               : "primary" または特定のカレンダーID
 // 2. プロジェクト設定 > タイムゾーン を Asia/Tokyo に設定
 // 3. デプロイ > 新しいデプロイ > ウェブアプリ
@@ -19,10 +19,10 @@
 // ============================================================
 var CONFIG = {
   LINE_CHANNEL_ACCESS_TOKEN: PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN'),
-  CLAUDE_API_KEY:            PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY'),
+  GEMINI_API_KEY:            PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'),
   CALENDAR_ID:               PropertiesService.getScriptProperties().getProperty('CALENDAR_ID') || 'primary',
-  CLAUDE_MODEL:              'claude-haiku-4-5-20251001',
-  CLAUDE_API_URL:            'https://api.anthropic.com/v1/messages',
+  GEMINI_MODEL:              'gemini-2.0-flash',
+  GEMINI_API_URL:            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
   LINE_REPLY_URL:            'https://api.line.me/v2/bot/message/reply',
   DEFAULT_EVENT_DURATION_MIN: 60  // 終了時刻が不明な場合のデフォルト時間（分）
 };
@@ -64,7 +64,7 @@ function handleLineEvent(event) {
   var userText   = event.message.text;
 
   try {
-    var parsed = parseEventWithClaude(userText);
+    var parsed = parseEventWithGemini(userText);
 
     if (!parsed || parsed.error) {
       replyToLine(replyToken, buildErrorMessage(parsed ? parsed.error : '解析に失敗しました'));
@@ -81,10 +81,11 @@ function handleLineEvent(event) {
 }
 
 // ============================================================
-// NLP: CLAUDE API
+// NLP: GEMINI API（無料）
 // ============================================================
 /**
- * Claude API に自然言語テキストを送り、予定情報をJSONで返す。
+ * Gemini API に自然言語テキストを送り、予定情報をJSONで返す。
+ * Google AI Studio (aistudio.google.com) で無料のAPIキーを取得できます。
  *
  * 返り値の形式:
  * {
@@ -101,10 +102,10 @@ function handleLineEvent(event) {
  *   error: "エラーメッセージ"
  * }
  */
-function parseEventWithClaude(userText) {
+function parseEventWithGemini(userText) {
   var today = getToday();
 
-  var systemPrompt = [
+  var prompt = [
     'あなたは日本語のスケジュール文章から予定情報を抽出するアシスタントです。',
     '必ず以下のJSON形式のみで返答してください。余分な文字・Markdownコードブロック・説明文は一切含めないでください。',
     '',
@@ -138,43 +139,45 @@ function parseEventWithClaude(userText) {
     '- endTime は明示されていない場合 null を返す',
     '- 「〜から〜まで」「〜〜時〜〜時」などは開始・終了時刻を両方抽出する',
     '- タイトルは「の予定」「について」などの助詞を除いた核心部分を抽出する',
+    '',
+    '次の文章から予定を抽出してください:',
+    userText,
   ].join('\n');
 
-  var userPrompt = '次の文章から予定を抽出してください:\n' + userText;
-
   var payload = {
-    model: CONFIG.CLAUDE_MODEL,
-    max_tokens: 256,
-    system: systemPrompt,
-    messages: [
-      { role: 'user', content: userPrompt }
-    ]
+    contents: [
+      {
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      maxOutputTokens: 256,
+      temperature: 0
+    }
   };
+
+  var url = CONFIG.GEMINI_API_URL + '?key=' + CONFIG.GEMINI_API_KEY;
 
   var options = {
     method: 'post',
     contentType: 'application/json',
-    headers: {
-      'x-api-key': CONFIG.CLAUDE_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
 
-  var response     = UrlFetchApp.fetch(CONFIG.CLAUDE_API_URL, options);
+  var response     = UrlFetchApp.fetch(url, options);
   var responseCode = response.getResponseCode();
   var responseText = response.getContentText();
 
   if (responseCode !== 200) {
-    Logger.log('Claude API error ' + responseCode + ': ' + responseText);
-    throw new Error('Claude API がエラーを返しました (HTTP ' + responseCode + ')');
+    Logger.log('Gemini API error ' + responseCode + ': ' + responseText);
+    throw new Error('Gemini API がエラーを返しました (HTTP ' + responseCode + ')');
   }
 
   var responseJson = JSON.parse(responseText);
-  var rawContent   = responseJson.content[0].text.trim();
+  var rawContent   = responseJson.candidates[0].content.parts[0].text.trim();
 
-  // Claude が指示に反してMarkdownコードブロックを付けた場合に除去
+  // Gemini が Markdown コードブロックを付けた場合に除去
   rawContent = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
 
   return JSON.parse(rawContent);
