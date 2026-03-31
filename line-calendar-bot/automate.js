@@ -111,7 +111,7 @@ function initBot() {
 // ============================================================
 function setLineWebhook(token, webhookUrl) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ webhook: webhookUrl });
+    const body = JSON.stringify({ endpoint: webhookUrl });
     const req  = https.request(
       {
         hostname: 'api.line.me',
