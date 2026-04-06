@@ -63,3 +63,51 @@
 | (例) Deep Meditation | BGM | https://... | 汎用メンタルケア用 |
 | (例) Gentle Waves | 環境音 | https://... | 睡眠導入ループ用 |
 | | | | |
+
+---
+
+## 🔍 素材収集の検索キーワード
+
+動画ごとに素材を探す際に使う検索キーワードのリファレンス。
+
+### Freesound（英語検索）
+
+| 用途 | 検索キーワード |
+|---|---|
+| 川のせせらぎ | `river stream gentle`, `creek babbling`, `river ambience loop` |
+| 波の音 | `ocean waves calm`, `sea waves gentle loop`, `beach waves soft` |
+| 雨の音 | `rain on tent`, `rain gentle`, `rain ambience loop`, `soft rain` |
+| 焚き火 | `campfire crackling`, `fireplace loop`, `bonfire ambience` |
+| 森の環境音 | `forest ambience birds`, `woodland atmosphere`, `nature forest calm` |
+| 風の音 | `gentle wind`, `breeze through trees`, `soft wind ambience` |
+| ホワイトノイズ | `white noise`, `pink noise`, `brown noise loop` |
+
+### YouTube Audio Library
+
+| 用途 | 検索キーワード |
+|---|---|
+| 瞑想BGM | `Ambient`, `Meditation`, `Calm` |
+| 暗め（深化パート用） | `Dark`, `Cinematic`, `Mystery` |
+| 明るめ（覚醒パート用） | `Bright`, `Hopeful`, `Gentle` |
+
+### DOVA-SYNDROME（日本語検索）
+
+| 用途 | 検索キーワード |
+|---|---|
+| ヒーリング系 | 「ヒーリング」「癒し」「アンビエント」 |
+| 瞑想系 | 「瞑想」「リラクゼーション」「マインドフルネス」 |
+| 神秘系 | 「神秘」「宇宙」「ファンタジー」 |
+
+---
+
+## 📋 動画別 推奨素材マッピング
+
+初回〜5本目の動画で使う環境音・BGMの目安。
+
+| 動画 | 推奨環境音 | 推奨BGM | 備考 |
+|---|---|---|---|
+| 001 考えすぎを止める | 川のせせらぎ | なし or 極小音量アンビエント | 暗示パートに川のイメージがあるため |
+| 002 深い眠り | 波の音 | なし | 波のリズムで呼吸を誘導 |
+| 003 自己肯定感 | 森の環境音 | 極小音量ヒーリングBGM | 温かいイメージに合う |
+| 004 不安+安眠 | 雨の音 | なし | 守られている安心感 |
+| 005 前世退行 | 低音ドローン | 神秘系アンビエント | 意識探求の世界観に合う |
